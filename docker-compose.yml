@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: subtrack-postgres
+    environment:
+      POSTGRES_DB: subtrack_db
+      POSTGRES_USER: subtrack_user
+      POSTGRES_PASSWORD: subtrack_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - subtrack_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  subtrack_postgres_data:
