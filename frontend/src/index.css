@@ -68,3 +68,51 @@ body {
   color: #dc2626;
   font-weight: 700;
 }
+
+.subscription-section {
+  margin-top: 32px;
+}
+
+.subscription-section h2 {
+  margin: 0 0 16px;
+  font-size: 24px;
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.subscription-card {
+  padding: 18px;
+  border-radius: 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.subscription-card h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.subscription-card p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.subscription-price {
+  margin-top: 18px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.subscription-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  color: #4b5563;
+  font-size: 14px;
+}
