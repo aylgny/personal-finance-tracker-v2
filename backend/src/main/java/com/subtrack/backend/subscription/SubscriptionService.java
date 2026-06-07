@@ -39,7 +39,7 @@ public class SubscriptionService {
     }
 
     public List<SubscriptionResponse> getSubscriptionsForUser(Long userId) {
-        // Always filter by userId so users can only see their own subscriptions.
+        // Subscriptions are user-owned, so users must only see their own records.
         return subscriptionRepository.findByUserIdOrderByNextPaymentDateAsc(userId)
                 .stream()
                 .map(this::toResponse)
@@ -51,28 +51,25 @@ public class SubscriptionService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Currency is required and must belong to the authenticated user.
-        // This prevents users from attaching another user's currency to their subscription.
-        Currency currency = currencyRepository.findByIdAndUserId(request.currencyId(), userId)
+        // Currency is global reference data, so it is validated by ID only.
+        Currency currency = currencyRepository.findById(request.currencyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Currency not found"));
 
-        // Category is optional, but if provided, it must belong to the authenticated user.
-        // This check helps prevent IDOR issues.
+        // Category is global reference data and optional.
         Category category = null;
         if (request.categoryId() != null) {
-            category = categoryRepository.findByIdAndUserId(request.categoryId(), userId)
+            category = categoryRepository.findById(request.categoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
         }
 
-        // Payment method is optional, but if provided, it must belong to the authenticated user.
-        // This check also prevents cross-user access to related records.
+        // Payment method is global reference data and optional.
         PaymentMethod paymentMethod = null;
         if (request.paymentMethodId() != null) {
-            paymentMethod = paymentMethodRepository.findByIdAndUserId(request.paymentMethodId(), userId)
+            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
                     .orElseThrow(() -> new ResourceNotFoundException("Payment method not found"));
         }
 
-        // Default values are applied here so the frontend does not need to send every optional field.
+        // Apply backend defaults so the frontend does not need to send every optional field.
         Subscription subscription = new Subscription(
                 user,
                 category,
@@ -98,7 +95,6 @@ public class SubscriptionService {
 
     private SubscriptionResponse toResponse(Subscription subscription) {
         // Convert the database entity into a safe API response DTO.
-        // This avoids exposing the full JPA entity graph directly to the frontend.
         return new SubscriptionResponse(
                 subscription.getId(),
                 subscription.getName(),

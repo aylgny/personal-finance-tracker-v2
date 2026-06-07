@@ -1,8 +1,9 @@
 package com.subtrack.backend.currency;
 
 import com.subtrack.backend.shared.BaseEntity;
-import com.subtrack.backend.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 
@@ -10,11 +11,7 @@ import java.math.BigDecimal;
 @Table(name = "currencies")
 public class Currency extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
-
-    @Column(nullable = false, length = 3)
+    @Column(nullable = false, length = 10)
     private String code;
 
     @Column(nullable = false, length = 10)
@@ -29,16 +26,11 @@ public class Currency extends BaseEntity {
     protected Currency() {
     }
 
-    public Currency(User user, String code, String symbol, String name, BigDecimal exchangeRate) {
-        this.user = user;
+    public Currency(String code, String symbol, String name, BigDecimal exchangeRate) {
         this.code = code;
         this.symbol = symbol;
         this.name = name;
         this.exchangeRate = exchangeRate;
-    }
-
-    public User getUser() {
-        return user;
     }
 
     public String getCode() {

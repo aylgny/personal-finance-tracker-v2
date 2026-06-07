@@ -1,16 +1,13 @@
 package com.subtrack.backend.category;
 
 import com.subtrack.backend.shared.BaseEntity;
-import com.subtrack.backend.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "categories")
 public class Category extends BaseEntity {
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -21,14 +18,9 @@ public class Category extends BaseEntity {
     protected Category() {
     }
 
-    public Category(User user, String name, Integer sortOrder) {
-        this.user = user;
+    public Category(String name, Integer sortOrder) {
         this.name = name;
         this.sortOrder = sortOrder;
-    }
-
-    public User getUser() {
-        return user;
     }
 
     public String getName() {
