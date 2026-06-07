@@ -60,6 +60,20 @@ public class SubscriptionController {
         subscriptionService.deleteSubscription(currentUserId, subscriptionId);
     }
 
+    @PatchMapping("/{subscriptionId}/disable")
+    public SubscriptionResponse disableSubscription(@PathVariable Long subscriptionId) {
+        Long currentUserId = getAuthenticatedUserId();
+
+        return subscriptionService.disableSubscription(currentUserId, subscriptionId);
+    }
+
+    @PatchMapping("/{subscriptionId}/activate")
+    public SubscriptionResponse activateSubscription(@PathVariable Long subscriptionId) {
+        Long currentUserId = getAuthenticatedUserId();
+
+        return subscriptionService.activateSubscription(currentUserId, subscriptionId);
+    }
+
     private Long getAuthenticatedUserId() {
         // Never trust userId values sent from the frontend.
         // The authenticated user ID must always come from the JWT request context.
