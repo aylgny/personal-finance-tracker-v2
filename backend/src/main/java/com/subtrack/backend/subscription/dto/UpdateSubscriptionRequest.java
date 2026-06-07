@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record CreateSubscriptionRequest(
+public record UpdateSubscriptionRequest(
 
         @NotBlank(message = "Subscription name is required")
         @Size(max = 150, message = "Subscription name must be at most 150 characters")

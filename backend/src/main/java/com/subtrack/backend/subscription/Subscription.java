@@ -5,7 +5,14 @@ import com.subtrack.backend.currency.Currency;
 import com.subtrack.backend.paymentmethod.PaymentMethod;
 import com.subtrack.backend.shared.BaseEntity;
 import com.subtrack.backend.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -62,6 +69,9 @@ public class Subscription extends BaseEntity {
     @Column(name = "notify_days_before", nullable = false)
     private Integer notifyDaysBefore;
 
+    @Column(name = "website_url", length = 500)
+    private String websiteUrl;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -83,6 +93,7 @@ public class Subscription extends BaseEntity {
             Boolean autoRenew,
             Boolean notifyEnabled,
             Integer notifyDaysBefore,
+            String websiteUrl,
             String notes
     ) {
         this.user = user;
@@ -99,6 +110,41 @@ public class Subscription extends BaseEntity {
         this.autoRenew = autoRenew;
         this.notifyEnabled = notifyEnabled;
         this.notifyDaysBefore = notifyDaysBefore;
+        this.websiteUrl = websiteUrl;
+        this.notes = notes;
+    }
+
+    public void updateDetails(
+            Category category,
+            PaymentMethod paymentMethod,
+            Currency currency,
+            String name,
+            String provider,
+            BigDecimal price,
+            BillingCycle billingCycle,
+            LocalDate startDate,
+            LocalDate nextPaymentDate,
+            Boolean autoRenew,
+            Boolean notifyEnabled,
+            Integer notifyDaysBefore,
+            String websiteUrl,
+            String notes
+    ) {
+        // Update only editable fields.
+        // The subscription owner must not change during an edit operation.
+        this.category = category;
+        this.paymentMethod = paymentMethod;
+        this.currency = currency;
+        this.name = name;
+        this.provider = provider;
+        this.price = price;
+        this.billingCycle = billingCycle;
+        this.startDate = startDate;
+        this.nextPaymentDate = nextPaymentDate;
+        this.autoRenew = autoRenew;
+        this.notifyEnabled = notifyEnabled;
+        this.notifyDaysBefore = notifyDaysBefore;
+        this.websiteUrl = websiteUrl;
         this.notes = notes;
     }
 
@@ -156,6 +202,10 @@ public class Subscription extends BaseEntity {
 
     public Integer getNotifyDaysBefore() {
         return notifyDaysBefore;
+    }
+
+    public String getWebsiteUrl() {
+        return websiteUrl;
     }
 
     public String getNotes() {
