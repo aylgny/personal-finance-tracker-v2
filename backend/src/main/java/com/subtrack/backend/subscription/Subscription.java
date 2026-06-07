@@ -43,7 +43,7 @@ public class Subscription extends BaseEntity {
     @Column(length = 150)
     private String provider;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal price;
 
     @Enumerated(EnumType.STRING)
@@ -72,7 +72,7 @@ public class Subscription extends BaseEntity {
     @Column(name = "website_url", length = 500)
     private String websiteUrl;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String notes;
 
     protected Subscription() {
