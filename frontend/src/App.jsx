@@ -1,84 +1,423 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState } from "react";
 import { getBackendHealth } from "./services/healthService";
-import { getSubscriptions } from "./services/subscriptionService";
+import {
+  createSubscription,
+  getSubscriptions,
+} from "./services/subscriptionService";
+import { login } from "./services/authService";
+
+const emptySubscriptionForm = {
+  name: "",
+  provider: "",
+  price: "",
+  billingCycle: "MONTHLY",
+  startDate: "",
+  nextPaymentDate: "",
+  currencyId: "",
+  notes: "",
+};
+
+function formatDate(dateValue) {
+  if (!dateValue) {
+    return "-";
+  }
+
+  return new Date(dateValue).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function App() {
   const [backendStatus, setBackendStatus] = useState("Checking...");
-  const [backendService, setBackendService] = useState("-");
   const [subscriptions, setSubscriptions] = useState([]);
   const [error, setError] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [authUser, setAuthUser] = useState(() => {
+    const savedUser = localStorage.getItem("subtrack_user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [newSubscription, setNewSubscription] = useState(emptySubscriptionForm);
+
+  const filteredSubscriptions = subscriptions.filter((subscription) => {
+    const searchValue = searchText.toLowerCase();
+
+    return (
+        subscription.name?.toLowerCase().includes(searchValue) ||
+        subscription.provider?.toLowerCase().includes(searchValue) ||
+        subscription.categoryName?.toLowerCase().includes(searchValue)
+    );
+  });
+
+  async function loadSubscriptions() {
+    // Fetch subscriptions for the authenticated user.
+    // The JWT token is automatically attached by the Axios interceptor.
+    const subscriptionData = await getSubscriptions();
+    setSubscriptions(subscriptionData);
+  }
 
   useEffect(() => {
-    async function loadInitialData() {
+    async function loadHealth() {
       try {
         const healthData = await getBackendHealth();
         setBackendStatus(healthData.status);
-        setBackendService(healthData.service);
-
-        const subscriptionData = await getSubscriptions();
-        setSubscriptions(subscriptionData);
-      } catch (err) {
+      } catch {
         setBackendStatus("DOWN");
-        setBackendService("-");
-        setError("Backend connection failed.");
       }
     }
 
-    loadInitialData();
+    // Explicitly ignore the returned promise to keep lint rules satisfied.
+    void loadHealth();
   }, []);
 
-  return (
-    <main className="app-container">
-      <section className="hero-card">
-        <p className="eyebrow">Personal Finance Tracker</p>
-        <h1>SubTrack</h1>
-        <p>
-          Track subscriptions, upcoming payments, budgets, and spending insights
-          from one dashboard.
-        </p>
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
 
-        <div className="status-card">
-          <strong>Backend Status:</strong>
-          <span>{backendStatus}</span>
-        </div>
+    // Load subscription data only after the user is authenticated.
+    void loadSubscriptions().catch(() => {
+      setError("Could not load subscriptions.");
+    });
+  }, [authUser]);
 
-        <div className="status-card">
-          <strong>Backend Service:</strong>
-          <span>{backendService}</span>
-        </div>
+  async function handleLogin(event) {
+    event.preventDefault();
+    setError("");
 
-        {error && <p className="error-message">{error}</p>}
+    try {
+      const data = await login(email, password);
 
-        <section className="subscription-section">
-          <h2>Subscriptions</h2>
+      // Store JWT and user info so the user stays logged in after refresh.
+      localStorage.setItem("subtrack_token", data.token);
+      localStorage.setItem(
+          "subtrack_user",
+          JSON.stringify({
+            userId: data.userId,
+            name: data.name,
+            email: data.email,
+          })
+      );
 
-          {subscriptions.length === 0 && !error ? (
-            <p>No subscriptions found.</p>
-          ) : (
-            <div className="subscription-grid">
-              {subscriptions.map((subscription) => (
-                <article className="subscription-card" key={subscription.id}>
-                  <div>
-                    <h3>{subscription.name}</h3>
-                    <p>{subscription.categoryName}</p>
-                  </div>
+      setAuthUser({
+        userId: data.userId,
+        name: data.name,
+        email: data.email,
+      });
+    } catch {
+      setError("Login failed. Please check your email and password.");
+    }
+  }
 
-                  <div className="subscription-price">
-                    {subscription.currencySymbol}
-                    {subscription.price}
-                  </div>
+  function handleLogout() {
+    // Clear local auth data and return to the login screen.
+    localStorage.removeItem("subtrack_token");
+    localStorage.removeItem("subtrack_user");
 
-                  <div className="subscription-meta">
-                    <span>{subscription.billingCycle}</span>
-                    <span>Next: {subscription.nextPaymentDate}</span>
-                  </div>
-                </article>
-              ))}
+    setAuthUser(null);
+    setSubscriptions([]);
+    setError("");
+  }
+
+  function handleSubscriptionInputChange(event) {
+    const { name, value } = event.target;
+
+    setNewSubscription((currentValue) => ({
+      ...currentValue,
+      [name]: value,
+    }));
+  }
+
+  function openCreateModal() {
+    setError("");
+    setNewSubscription(emptySubscriptionForm);
+    setIsCreateModalOpen(true);
+  }
+
+  function closeCreateModal() {
+    setIsCreateModalOpen(false);
+    setNewSubscription(emptySubscriptionForm);
+  }
+
+  async function handleCreateSubscription(event) {
+    event.preventDefault();
+    setError("");
+
+    try {
+      // The backend gets the userId from JWT, not from this request body.
+      await createSubscription({
+        name: newSubscription.name,
+        provider: newSubscription.provider || null,
+        price: Number(newSubscription.price),
+        billingCycle: newSubscription.billingCycle,
+        startDate: newSubscription.startDate || null,
+        nextPaymentDate: newSubscription.nextPaymentDate,
+        autoRenew: true,
+        notifyEnabled: true,
+        notifyDaysBefore: 3,
+        currencyId: Number(newSubscription.currencyId),
+        notes: newSubscription.notes || null,
+      });
+
+      closeCreateModal();
+      await loadSubscriptions();
+    } catch {
+      setError(
+          "Could not create subscription. Please check the form values and currency ID."
+      );
+    }
+  }
+
+  if (!authUser) {
+    return (
+        <main className="st-auth-page">
+          <section className="st-auth-card">
+            <p className="st-eyebrow">Personal Finance Tracker</p>
+            <h1>SubTrack</h1>
+            <p className="st-auth-description">
+              Track subscriptions, upcoming payments, and spending insights from
+              one dashboard.
+            </p>
+
+            <div className="st-system-line">
+              <span>Backend</span>
+              <strong className={backendStatus === "UP" ? "st-up" : "st-down"}>
+                {backendStatus}
+              </strong>
             </div>
+
+            <form className="st-login-form" onSubmit={handleLogin}>
+              <div className="st-field">
+                <label htmlFor="email">Email</label>
+                <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    placeholder="Enter your email"
+                    onChange={(event) => setEmail(event.target.value)}
+                />
+              </div>
+
+              <div className="st-field">
+                <label htmlFor="password">Password</label>
+                <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    placeholder="Enter your password"
+                    onChange={(event) => setPassword(event.target.value)}
+                />
+              </div>
+
+              <button className="st-primary-button" type="submit">
+                Login
+              </button>
+            </form>
+
+            {error && <p className="st-error">{error}</p>}
+          </section>
+        </main>
+    );
+  }
+
+  return (
+      <main className="st-dashboard">
+        <header className="st-topbar">
+          <div className="st-logo">
+            <span className="st-logo-mark">S</span>
+            <span>SubTrack</span>
+          </div>
+
+          <div className="st-user-menu">
+            <span className="st-avatar">{authUser.name?.charAt(0) || "U"}</span>
+            <span>{authUser.name}</span>
+            <button type="button" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
+        </header>
+
+        <section className="st-toolbar">
+          <button className="st-primary-button" type="button" onClick={openCreateModal}>
+            + New Subscription
+          </button>
+
+          <div className="st-search-box">
+            <input
+                type="text"
+                value={searchText}
+                placeholder="Search"
+                onChange={(event) => setSearchText(event.target.value)}
+            />
+            <span>⌕</span>
+          </div>
+
+          <button className="st-icon-button" type="button">
+            ⌄
+          </button>
+
+          <button className="st-icon-button" type="button">
+            ≡
+          </button>
+        </section>
+
+        {error && <p className="st-error st-dashboard-error">{error}</p>}
+
+        <section className="st-subscription-list">
+          {filteredSubscriptions.length === 0 ? (
+              <div className="st-empty-state">
+                <h2>No subscriptions found</h2>
+                <p>Create your first subscription using the button above.</p>
+              </div>
+          ) : (
+              filteredSubscriptions.map((subscription) => (
+                  <article className="st-subscription-row" key={subscription.id}>
+                    <div className="st-brand-placeholder">
+                      {subscription.name?.charAt(0) || "S"}
+                    </div>
+
+                    <div className="st-subscription-name">
+                      <strong>{subscription.name}</strong>
+                      <span>{subscription.provider || "No provider"}</span>
+                    </div>
+
+                    <div className="st-subscription-cycle">
+                      ↻ {subscription.billingCycle?.toLowerCase()}
+                    </div>
+
+                    <div className="st-subscription-date">
+                      {formatDate(subscription.nextPaymentDate)}
+                    </div>
+
+                    <div className="st-subscription-price">
+                      <strong>
+                        {subscription.currencySymbol}
+                        {subscription.price}
+                      </strong>
+                      <span>{subscription.categoryName || "No category"}</span>
+                    </div>
+
+                    <button className="st-row-menu" type="button">
+                      ⋮
+                    </button>
+                  </article>
+              ))
           )}
         </section>
-      </section>
-    </main>
+
+        {isCreateModalOpen && (
+            <div className="st-modal-backdrop">
+              <section className="st-modal">
+                <header className="st-modal-header">
+                  <h2>Add subscription</h2>
+                  <button type="button" onClick={closeCreateModal}>
+                    ×
+                  </button>
+                </header>
+
+                <form className="st-modal-form" onSubmit={handleCreateSubscription}>
+                  <div className="st-full-field">
+                    <input
+                        name="name"
+                        type="text"
+                        value={newSubscription.name}
+                        placeholder="Subscription name"
+                        onChange={handleSubscriptionInputChange}
+                    />
+                  </div>
+
+                  <div className="st-form-grid">
+                    <input
+                        name="price"
+                        type="number"
+                        step="0.01"
+                        value={newSubscription.price}
+                        placeholder="Price"
+                        onChange={handleSubscriptionInputChange}
+                    />
+
+                    <input
+                        name="currencyId"
+                        type="number"
+                        value={newSubscription.currencyId}
+                        placeholder="Currency ID"
+                        onChange={handleSubscriptionInputChange}
+                    />
+                  </div>
+
+                  <div className="st-form-grid">
+                    <input
+                        name="provider"
+                        type="text"
+                        value={newSubscription.provider}
+                        placeholder="Provider"
+                        onChange={handleSubscriptionInputChange}
+                    />
+
+                    <select
+                        name="billingCycle"
+                        value={newSubscription.billingCycle}
+                        onChange={handleSubscriptionInputChange}
+                    >
+                      <option value="MONTHLY">Month(s)</option>
+                      <option value="YEARLY">Yearly</option>
+                      <option value="WEEKLY">Weekly</option>
+                    </select>
+                  </div>
+
+                  <div className="st-form-grid">
+                    <label>
+                      Start Date
+                      <input
+                          name="startDate"
+                          type="date"
+                          value={newSubscription.startDate}
+                          onChange={handleSubscriptionInputChange}
+                      />
+                    </label>
+
+                    <label>
+                      Next Payment
+                      <input
+                          name="nextPaymentDate"
+                          type="date"
+                          value={newSubscription.nextPaymentDate}
+                          onChange={handleSubscriptionInputChange}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="st-full-field">
+                    <input
+                        name="notes"
+                        type="text"
+                        value={newSubscription.notes}
+                        placeholder="Notes"
+                        onChange={handleSubscriptionInputChange}
+                    />
+                  </div>
+
+                  <div className="st-modal-actions">
+                    <button className="st-secondary-button" type="button" onClick={closeCreateModal}>
+                      Cancel
+                    </button>
+                    <button className="st-primary-button" type="submit">
+                      Save
+                    </button>
+                  </div>
+                </form>
+              </section>
+            </div>
+        )}
+      </main>
   );
 }
 

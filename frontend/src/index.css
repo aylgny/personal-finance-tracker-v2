@@ -6,113 +6,392 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f6f8;
-  color: #111827;
-  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #f5f5f5;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  sans-serif;
 }
 
-.app-container {
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.st-auth-page {
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   padding: 32px;
+  background: #111827;
 }
 
-.hero-card {
-  width: 100%;
-  max-width: 720px;
-  padding: 40px;
+.st-auth-card {
+  width: min(620px, 100%);
+  padding: 36px;
   border-radius: 24px;
-  background: #ffffff;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  background: #1f2937;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
 }
 
-.eyebrow {
+.st-eyebrow {
   margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #4f46e5;
+  color: #60a5fa;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
-.hero-card h1 {
-  margin: 0 0 16px;
+.st-auth-card h1 {
+  margin: 0;
   font-size: 48px;
 }
 
-.hero-card p {
-  font-size: 18px;
+.st-auth-description {
+  color: #d1d5db;
   line-height: 1.6;
 }
 
-.status-card {
+.st-system-line {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 16px;
-  padding: 16px;
+  padding: 14px 16px;
+  margin: 24px 0;
   border-radius: 14px;
-  background: #f3f4f6;
-  font-size: 16px;
+  background: #111827;
 }
 
-.status-card span {
-  font-weight: 700;
-  color: #16a34a;
+.st-up {
+  color: #22c55e;
 }
 
-.error-message {
-  margin-top: 16px;
-  color: #dc2626;
-  font-weight: 700;
+.st-down {
+  color: #ef4444;
 }
 
-.subscription-section {
-  margin-top: 32px;
-}
-
-.subscription-section h2 {
-  margin: 0 0 16px;
-  font-size: 24px;
-}
-
-.subscription-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+.st-login-form,
+.st-modal-form {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
-.subscription-card {
-  padding: 18px;
-  border-radius: 16px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+.st-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.subscription-card h3 {
-  margin: 0 0 6px;
-  font-size: 20px;
+.st-field label,
+.st-form-grid label {
+  color: #d1d5db;
+  font-weight: 700;
 }
 
-.subscription-card p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+.st-field input,
+.st-modal input,
+.st-modal select {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #4b5563;
+  border-radius: 10px;
+  background: #4b5563;
+  color: #f9fafb;
+  outline: none;
 }
 
-.subscription-price {
-  margin-top: 18px;
-  font-size: 24px;
+.st-field input:focus,
+.st-modal input:focus,
+.st-modal select:focus {
+  border-color: #0d8bff;
+  box-shadow: 0 0 0 3px rgba(13, 139, 255, 0.18);
+}
+
+.st-primary-button {
+  border: none;
+  border-radius: 10px;
+  padding: 13px 20px;
+  background: #0d8bff;
+  color: white;
   font-weight: 800;
 }
 
-.subscription-meta {
+.st-secondary-button {
+  border: 1px solid #0d8bff;
+  border-radius: 10px;
+  padding: 13px 20px;
+  background: transparent;
+  color: #0d8bff;
+  font-weight: 800;
+}
+
+.st-error {
+  margin: 16px 0 0;
+  color: #f87171;
+  font-weight: 700;
+}
+
+.st-dashboard {
+  min-height: 100vh;
+  background: #111;
+}
+
+.st-topbar {
+  height: 64px;
+  padding: 0 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1f1f1f;
+  border-bottom: 4px solid #0d8bff;
+}
+
+.st-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.st-logo-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #0d8bff;
+}
+
+.st-user-menu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.st-user-menu button {
+  border: none;
+  background: transparent;
+  color: #f9fafb;
+  font-weight: 700;
+}
+
+.st-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #111827;
+  font-weight: 900;
+}
+
+.st-toolbar {
+  max-width: 980px;
+  margin: 20px auto 18px;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 180px 1fr 66px 66px;
+  gap: 14px;
+  align-items: center;
+}
+
+.st-search-box {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: #4b4b4b;
+}
+
+.st-search-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: white;
+  outline: none;
+}
+
+.st-search-box span {
+  color: #0d8bff;
+  font-size: 24px;
+}
+
+.st-icon-button {
+  height: 42px;
+  border: 1px solid #0d8bff;
+  border-radius: 8px;
+  background: transparent;
+  color: #0d8bff;
+  font-weight: 900;
+}
+
+.st-dashboard-error {
+  max-width: 980px;
+  margin: 0 auto 16px;
+  padding: 0 24px;
+}
+
+.st-subscription-list {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.st-subscription-row {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 170px 1fr 130px 110px 130px 38px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 13px;
+  background: #222;
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 10, 0.08);
+}
+
+.st-brand-placeholder {
+  width: 150px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: #0d8bff;
+  font-size: 26px;
+  font-weight: 900;
+  background: #171717;
+}
+
+.st-subscription-name {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 12px;
-  color: #4b5563;
-  font-size: 14px;
+}
+
+.st-subscription-name span,
+.st-subscription-price span {
+  color: #a3a3a3;
+  font-size: 12px;
+}
+
+.st-subscription-cycle,
+.st-subscription-date {
+  color: #e5e7eb;
+}
+
+.st-subscription-price {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: right;
+}
+
+.st-row-menu {
+  border: none;
+  background: transparent;
+  color: #0d8bff;
+  font-size: 28px;
+}
+
+.st-empty-state {
+  padding: 48px;
+  text-align: center;
+  border-radius: 16px;
+  background: #222;
+  color: #d1d5db;
+}
+
+.st-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 100;
+}
+
+.st-modal {
+  width: min(760px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 18px;
+  border-radius: 14px;
+  background: #202020;
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.65);
+}
+
+.st-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #0d8bff;
+}
+
+.st-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.st-modal-header button {
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 28px;
+}
+
+.st-full-field {
+  width: 100%;
+}
+
+.st-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.st-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.st-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 18px;
+}
+
+@media (max-width: 760px) {
+  .st-topbar {
+    padding: 0 20px;
+  }
+
+  .st-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .st-subscription-row {
+    grid-template-columns: 1fr;
+  }
+
+  .st-brand-placeholder {
+    width: 100%;
+  }
+
+  .st-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
