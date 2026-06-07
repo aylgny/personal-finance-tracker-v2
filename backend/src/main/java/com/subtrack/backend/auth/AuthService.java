@@ -3,8 +3,6 @@ package com.subtrack.backend.auth;
 import com.subtrack.backend.auth.dto.AuthResponse;
 import com.subtrack.backend.auth.dto.LoginRequest;
 import com.subtrack.backend.auth.dto.RegisterRequest;
-import com.subtrack.backend.shared.exception.DuplicateResourceException;
-import com.subtrack.backend.shared.exception.UnauthorizedException;
 import com.subtrack.backend.user.User;
 import com.subtrack.backend.user.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,12 +26,10 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        // Prevent duplicate accounts with the same email address.
         if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateResourceException("Email is already in use");
+            throw new IllegalArgumentException("Email is already in use");
         }
 
-        // Store only the hashed password, never the raw password.
         String passwordHash = passwordEncoder.encode(request.password());
 
         User user = new User(
@@ -42,10 +38,7 @@ public class AuthService {
                 passwordHash
         );
 
-        // Save the new user before generating the JWT because we need the generated user ID.
         User savedUser = userRepository.save(user);
-
-        // Generate a JWT containing the saved user's ID and email.
         String token = jwtService.generateToken(savedUser.getId(), savedUser.getEmail());
 
         return new AuthResponse(
@@ -57,21 +50,18 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Use a generic error message so attackers cannot learn whether the email exists.
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
-        // Compare the raw password from the request with the stored password hash.
         boolean passwordMatches = passwordEncoder.matches(
                 request.password(),
                 user.getPasswordHash()
         );
 
         if (!passwordMatches) {
-            throw new UnauthorizedException("Invalid email or password");
+            throw new IllegalArgumentException("Invalid email or password");
         }
 
-        // Generate a JWT after the credentials are verified.
         String token = jwtService.generateToken(user.getId(), user.getEmail());
 
         return new AuthResponse(
