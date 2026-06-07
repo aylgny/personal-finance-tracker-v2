@@ -247,6 +247,10 @@ button {
   gap: 12px;
 }
 
+.st-subscription-item {
+  position: relative;
+}
+
 .st-subscription-row {
   min-height: 66px;
   display: grid;
@@ -257,6 +261,7 @@ button {
   border-radius: 13px;
   background: #222;
   box-shadow: inset 0 0 0 1px rgba(255, 214, 10, 0.08);
+  cursor: pointer;
 }
 
 .st-brand-placeholder {
@@ -295,11 +300,92 @@ button {
   text-align: right;
 }
 
+.st-row-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .st-row-menu {
   border: none;
   background: transparent;
   color: #0d8bff;
   font-size: 28px;
+}
+
+.st-action-menu {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 210px;
+  z-index: 20;
+  overflow: hidden;
+  border: 1px solid #333;
+  border-radius: 10px;
+  background: #1f1f1f;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.st-action-menu button {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid #333;
+  background: transparent;
+  color: #f5f5f5;
+  text-align: left;
+  font-weight: 700;
+}
+
+.st-action-menu button:last-child {
+  border-bottom: none;
+}
+
+.st-action-menu button:hover {
+  background: #2f2f2f;
+}
+
+.st-subscription-details {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin: -4px 14px 8px;
+  padding: 14px 18px;
+  border-radius: 0 0 13px 13px;
+  background: #181818;
+  border-top: 1px solid #2f2f2f;
+}
+
+.st-subscription-details div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.st-subscription-details span {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.st-subscription-details strong {
+  color: #f9fafb;
+  font-size: 14px;
+}
+
+.st-detail-website-button {
+  width: fit-content;
+  border: none;
+  background: transparent;
+  color: #0d8bff;
+  padding: 0;
+  font-weight: 800;
+  text-align: left;
+}
+
+.st-detail-website-button:hover {
+  text-decoration: underline;
 }
 
 .st-empty-state {
@@ -393,5 +479,13 @@ button {
 
   .st-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .st-subscription-details {
+    grid-template-columns: 1fr;
+  }
+
+  .st-action-menu {
+    right: 0;
   }
 }
