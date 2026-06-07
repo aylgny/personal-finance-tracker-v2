@@ -1,16 +1,13 @@
 package com.subtrack.backend.paymentmethod;
 
 import com.subtrack.backend.shared.BaseEntity;
-import com.subtrack.backend.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "payment_methods")
 public class PaymentMethod extends BaseEntity {
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -24,15 +21,10 @@ public class PaymentMethod extends BaseEntity {
     protected PaymentMethod() {
     }
 
-    public PaymentMethod(User user, String name, Boolean enabled, Integer sortOrder) {
-        this.user = user;
+    public PaymentMethod(String name, Boolean enabled, Integer sortOrder) {
         this.name = name;
         this.enabled = enabled;
         this.sortOrder = sortOrder;
-    }
-
-    public User getUser() {
-        return user;
     }
 
     public String getName() {

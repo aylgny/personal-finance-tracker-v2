@@ -3,6 +3,8 @@ package com.subtrack.backend.auth;
 import com.subtrack.backend.auth.dto.AuthResponse;
 import com.subtrack.backend.auth.dto.LoginRequest;
 import com.subtrack.backend.auth.dto.RegisterRequest;
+import com.subtrack.backend.shared.exception.DuplicateResourceException;
+import com.subtrack.backend.shared.exception.UnauthorizedException;
 import com.subtrack.backend.user.User;
 import com.subtrack.backend.user.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -70,7 +72,7 @@ class AuthServiceTest {
         assertThat(response.name()).isEqualTo("Aylin");
         assertThat(response.email()).isEqualTo("aylin@test.com");
 
-        // Verify: make sure the service followed the expected register flow.
+        // Verify: registration should check duplicates, hash the password, save the user, and generate a token.
         verify(userRepository).existsByEmail("aylin@test.com");
         verify(passwordEncoder).encode("123456");
         verify(userRepository).save(any(User.class));
@@ -89,9 +91,9 @@ class AuthServiceTest {
         // Arrange: simulate that this email is already used.
         when(userRepository.existsByEmail("aylin@test.com")).thenReturn(true);
 
-        // Act & Assert: registration should fail with a clear exception message.
+        // Act & Assert: duplicate email should map to a Conflict-style custom exception.
         assertThatThrownBy(() -> authService.register(request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(DuplicateResourceException.class)
                 .hasMessage("Email is already in use");
 
         // Verify: when email already exists, no password hashing, saving, or token generation should happen.
@@ -150,9 +152,9 @@ class AuthServiceTest {
         when(userRepository.findByEmail("missing@test.com"))
                 .thenReturn(Optional.empty());
 
-        // Act & Assert: login should fail with a generic invalid credentials message.
+        // Act & Assert: login should fail with an Unauthorized-style custom exception.
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid email or password");
 
         // Verify: if the user does not exist, password matching and token generation should not happen.
@@ -182,9 +184,9 @@ class AuthServiceTest {
         when(passwordEncoder.matches("wrong-password", "hashed-password"))
                 .thenReturn(false);
 
-        // Act & Assert: login should fail when the password does not match.
+        // Act & Assert: login should fail with an Unauthorized-style custom exception.
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid email or password");
 
         // Verify: token generation should not happen when the password is wrong.
@@ -192,6 +194,4 @@ class AuthServiceTest {
         verify(passwordEncoder).matches("wrong-password", "hashed-password");
         verify(jwtService, never()).generateToken(any(), anyString());
     }
-
-
 }
