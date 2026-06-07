@@ -127,6 +127,32 @@ public class SubscriptionService {
         subscriptionRepository.delete(subscription);
     }
 
+    public SubscriptionResponse disableSubscription(Long userId, Long subscriptionId) {
+        // IDOR protection:
+        // The subscription is searched by both subscription id and current user id.
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(subscriptionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found"));
+
+        subscription.changeStatus(SubscriptionStatus.INACTIVE);
+
+        Subscription updatedSubscription = subscriptionRepository.save(subscription);
+
+        return toResponse(updatedSubscription);
+    }
+
+    public SubscriptionResponse activateSubscription(Long userId, Long subscriptionId) {
+        // IDOR protection:
+        // The subscription is searched by both subscription id and current user id.
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(subscriptionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found"));
+
+        subscription.changeStatus(SubscriptionStatus.ACTIVE);
+
+        Subscription updatedSubscription = subscriptionRepository.save(subscription);
+
+        return toResponse(updatedSubscription);
+    }
+
     private Currency getCurrencyOrThrow(Long currencyId) {
         // Currency is required and comes from global reference data.
         return currencyRepository.findById(currencyId)

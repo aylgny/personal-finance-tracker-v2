@@ -148,6 +148,12 @@ public class Subscription extends BaseEntity {
         this.notes = notes;
     }
 
+    public void changeStatus(SubscriptionStatus status) {
+        // Change only the subscription status.
+        // The subscription owner and other business fields are not modified here.
+        this.status = status;
+    }
+
     public User getUser() {
         return user;
     }
