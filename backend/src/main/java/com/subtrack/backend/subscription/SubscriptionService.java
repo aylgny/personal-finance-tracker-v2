@@ -85,12 +85,28 @@ public class SubscriptionService {
                 request.autoRenew() != null ? request.autoRenew() : true,
                 request.notifyEnabled() != null ? request.notifyEnabled() : true,
                 request.notifyDaysBefore() != null ? request.notifyDaysBefore() : 3,
+                normalizeWebsiteUrl(request.websiteUrl()),
                 request.notes()
         );
 
         Subscription savedSubscription = subscriptionRepository.save(subscription);
 
         return toResponse(savedSubscription);
+    }
+
+    private String normalizeWebsiteUrl(String websiteUrl) {
+        // Keep empty values as null and add https:// when the user enters a bare domain.
+        if (websiteUrl == null || websiteUrl.isBlank()) {
+            return null;
+        }
+
+        String trimmedUrl = websiteUrl.trim();
+
+        if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+            return trimmedUrl;
+        }
+
+        return "https://" + trimmedUrl;
     }
 
     private SubscriptionResponse toResponse(Subscription subscription) {
@@ -111,6 +127,7 @@ public class SubscriptionService {
                 subscription.getNotifyDaysBefore(),
                 subscription.getCategory() != null ? subscription.getCategory().getName() : null,
                 subscription.getPaymentMethod() != null ? subscription.getPaymentMethod().getName() : null,
+                subscription.getWebsiteUrl(),
                 subscription.getNotes()
         );
     }
