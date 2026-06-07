@@ -9,6 +9,7 @@ import com.subtrack.backend.paymentmethod.PaymentMethodRepository;
 import com.subtrack.backend.shared.exception.ResourceNotFoundException;
 import com.subtrack.backend.subscription.dto.CreateSubscriptionRequest;
 import com.subtrack.backend.subscription.dto.SubscriptionResponse;
+import com.subtrack.backend.subscription.dto.UpdateSubscriptionRequest;
 import com.subtrack.backend.user.User;
 import com.subtrack.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -51,23 +52,9 @@ public class SubscriptionService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Currency is global reference data, so it is validated by ID only.
-        Currency currency = currencyRepository.findById(request.currencyId())
-                .orElseThrow(() -> new ResourceNotFoundException("Currency not found"));
-
-        // Category is global reference data and optional.
-        Category category = null;
-        if (request.categoryId() != null) {
-            category = categoryRepository.findById(request.categoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
-        }
-
-        // Payment method is global reference data and optional.
-        PaymentMethod paymentMethod = null;
-        if (request.paymentMethodId() != null) {
-            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Payment method not found"));
-        }
+        Currency currency = getCurrencyOrThrow(request.currencyId());
+        Category category = getCategoryOrNull(request.categoryId());
+        PaymentMethod paymentMethod = getPaymentMethodOrNull(request.paymentMethodId());
 
         // Apply backend defaults so the frontend does not need to send every optional field.
         Subscription subscription = new Subscription(
@@ -85,12 +72,100 @@ public class SubscriptionService {
                 request.autoRenew() != null ? request.autoRenew() : true,
                 request.notifyEnabled() != null ? request.notifyEnabled() : true,
                 request.notifyDaysBefore() != null ? request.notifyDaysBefore() : 3,
+                normalizeWebsiteUrl(request.websiteUrl()),
                 request.notes()
         );
 
         Subscription savedSubscription = subscriptionRepository.save(subscription);
 
         return toResponse(savedSubscription);
+    }
+
+    public SubscriptionResponse updateSubscription(
+            Long userId,
+            Long subscriptionId,
+            UpdateSubscriptionRequest request
+    ) {
+        // IDOR protection:
+        // The subscription is searched by both subscription id and current user id.
+        // This prevents a user from editing another user's subscription.
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(subscriptionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found"));
+
+        Currency currency = getCurrencyOrThrow(request.currencyId());
+        Category category = getCategoryOrNull(request.categoryId());
+        PaymentMethod paymentMethod = getPaymentMethodOrNull(request.paymentMethodId());
+
+        subscription.updateDetails(
+                category,
+                paymentMethod,
+                currency,
+                request.name(),
+                request.provider(),
+                request.price(),
+                request.billingCycle(),
+                request.startDate(),
+                request.nextPaymentDate(),
+                request.autoRenew() != null ? request.autoRenew() : true,
+                request.notifyEnabled() != null ? request.notifyEnabled() : true,
+                request.notifyDaysBefore() != null ? request.notifyDaysBefore() : 3,
+                normalizeWebsiteUrl(request.websiteUrl()),
+                request.notes()
+        );
+
+        Subscription updatedSubscription = subscriptionRepository.save(subscription);
+
+        return toResponse(updatedSubscription);
+    }
+
+    public void deleteSubscription(Long userId, Long subscriptionId) {
+        // IDOR protection:
+        // The delete operation also checks the current user id.
+        Subscription subscription = subscriptionRepository.findByIdAndUserId(subscriptionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found"));
+
+        subscriptionRepository.delete(subscription);
+    }
+
+    private Currency getCurrencyOrThrow(Long currencyId) {
+        // Currency is required and comes from global reference data.
+        return currencyRepository.findById(currencyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Currency not found"));
+    }
+
+    private Category getCategoryOrNull(Long categoryId) {
+        // Category is optional and comes from global reference data.
+        if (categoryId == null) {
+            return null;
+        }
+
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+    }
+
+    private PaymentMethod getPaymentMethodOrNull(Long paymentMethodId) {
+        // Payment method is optional and comes from global reference data.
+        if (paymentMethodId == null) {
+            return null;
+        }
+
+        return paymentMethodRepository.findById(paymentMethodId)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment method not found"));
+    }
+
+    private String normalizeWebsiteUrl(String websiteUrl) {
+        // Keep empty values as null and add https:// when the user enters a bare domain.
+        if (websiteUrl == null || websiteUrl.isBlank()) {
+            return null;
+        }
+
+        String trimmedUrl = websiteUrl.trim();
+
+        if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+            return trimmedUrl;
+        }
+
+        return "https://" + trimmedUrl;
     }
 
     private SubscriptionResponse toResponse(Subscription subscription) {
@@ -111,6 +186,7 @@ public class SubscriptionService {
                 subscription.getNotifyDaysBefore(),
                 subscription.getCategory() != null ? subscription.getCategory().getName() : null,
                 subscription.getPaymentMethod() != null ? subscription.getPaymentMethod().getName() : null,
+                subscription.getWebsiteUrl(),
                 subscription.getNotes()
         );
     }

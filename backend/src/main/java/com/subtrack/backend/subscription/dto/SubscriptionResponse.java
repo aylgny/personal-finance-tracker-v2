@@ -22,6 +22,7 @@ public record SubscriptionResponse(
         Integer notifyDaysBefore,
         String categoryName,
         String paymentMethodName,
+        String websiteUrl,
         String notes
 ) {
 }

@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { getBackendHealth } from "./services/healthService";
 import {
   createSubscription,
+  deleteSubscription,
   getSubscriptions,
+  updateSubscription,
 } from "./services/subscriptionService";
 import { login } from "./services/authService";
 import {
@@ -22,6 +24,7 @@ const emptySubscriptionForm = {
   currencyId: "",
   categoryId: "",
   paymentMethodId: "",
+  websiteUrl: "",
   notes: "",
 };
 
@@ -67,7 +70,8 @@ function App() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [error, setError] = useState("");
   const [searchText, setSearchText] = useState("");
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState(null);
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState(null);
   const [openMenuSubscriptionId, setOpenMenuSubscriptionId] = useState(null);
 
@@ -79,11 +83,11 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [newSubscription, setNewSubscription] = useState(emptySubscriptionForm);
+  const [subscriptionForm, setSubscriptionForm] = useState(emptySubscriptionForm);
 
   const calculatedNextPaymentDate = calculateNextPaymentDate(
-      newSubscription.startDate,
-      newSubscription.billingCycle
+      subscriptionForm.startDate,
+      subscriptionForm.billingCycle
   );
 
   const filteredSubscriptions = subscriptions.filter((subscription) => {
@@ -104,7 +108,7 @@ function App() {
   }
 
   async function loadReferenceData() {
-    // Fetch global dropdown data used by the create subscription modal.
+    // Fetch global dropdown data used by the subscription modal.
     const [currencyData, categoryData, paymentMethodData] = await Promise.all([
       getCurrencies(),
       getCategories(),
@@ -181,23 +185,53 @@ function App() {
     setPaymentMethods([]);
     setExpandedSubscriptionId(null);
     setOpenMenuSubscriptionId(null);
+    setEditingSubscription(null);
+    setIsSubscriptionModalOpen(false);
     setError("");
   }
 
   function handleSubscriptionInputChange(event) {
     const { name, value } = event.target;
 
-    setNewSubscription((currentValue) => ({
+    setSubscriptionForm((currentValue) => ({
       ...currentValue,
       [name]: value,
     }));
   }
 
+  function findCurrencyIdForSubscription(subscription) {
+    // API response returns currencyCode, while the form needs currencyId.
+    const matchedCurrency = currencies.find(
+        (currency) => currency.code === subscription.currencyCode
+    );
+
+    return matchedCurrency?.id ? String(matchedCurrency.id) : "";
+  }
+
+  function findCategoryIdForSubscription(subscription) {
+    // API response returns categoryName, while the form needs categoryId.
+    const matchedCategory = categories.find(
+        (category) => category.name === subscription.categoryName
+    );
+
+    return matchedCategory?.id ? String(matchedCategory.id) : "";
+  }
+
+  function findPaymentMethodIdForSubscription(subscription) {
+    // API response returns paymentMethodName, while the form needs paymentMethodId.
+    const matchedPaymentMethod = paymentMethods.find(
+        (paymentMethod) => paymentMethod.name === subscription.paymentMethodName
+    );
+
+    return matchedPaymentMethod?.id ? String(matchedPaymentMethod.id) : "";
+  }
+
   function openCreateModal() {
     setError("");
+    setEditingSubscription(null);
 
     // Preselect the first available dropdown options to make the form easier to submit.
-    setNewSubscription({
+    setSubscriptionForm({
       ...emptySubscriptionForm,
       paidBy: authUser?.name || "",
       currencyId: currencies[0]?.id ? String(currencies[0].id) : "",
@@ -205,12 +239,36 @@ function App() {
       paymentMethodId: paymentMethods[0]?.id ? String(paymentMethods[0].id) : "",
     });
 
-    setIsCreateModalOpen(true);
+    setIsSubscriptionModalOpen(true);
   }
 
-  function closeCreateModal() {
-    setIsCreateModalOpen(false);
-    setNewSubscription(emptySubscriptionForm);
+  function openEditModal(event, subscription) {
+    // Open the same modal in edit mode and prefill it with the selected subscription.
+    event.stopPropagation();
+    setError("");
+    setOpenMenuSubscriptionId(null);
+    setEditingSubscription(subscription);
+
+    setSubscriptionForm({
+      name: subscription.name || "",
+      paidBy: subscription.provider || "",
+      price: subscription.price ? String(subscription.price) : "",
+      billingCycle: subscription.billingCycle || "MONTHLY",
+      startDate: subscription.startDate || "",
+      currencyId: findCurrencyIdForSubscription(subscription),
+      categoryId: findCategoryIdForSubscription(subscription),
+      paymentMethodId: findPaymentMethodIdForSubscription(subscription),
+      websiteUrl: subscription.websiteUrl || "",
+      notes: subscription.notes || "",
+    });
+
+    setIsSubscriptionModalOpen(true);
+  }
+
+  function closeSubscriptionModal() {
+    setIsSubscriptionModalOpen(false);
+    setEditingSubscription(null);
+    setSubscriptionForm(emptySubscriptionForm);
   }
 
   function toggleSubscriptionDetails(subscriptionId) {
@@ -232,56 +290,109 @@ function App() {
     );
   }
 
-  function handleSubscriptionAction(event, actionName) {
-    // These actions are UI placeholders for now.
-    // Later we will connect edit/delete/clone to backend endpoints.
+  function handleClonePlaceholder(event) {
+    // Clone is intentionally kept as a placeholder for a later feature.
     event.stopPropagation();
     setOpenMenuSubscriptionId(null);
-    setError(`${actionName} action is not implemented yet.`);
+    setError("Clone action is not implemented yet.");
   }
 
-  async function handleCreateSubscription(event) {
-    event.preventDefault();
+  async function handleDeleteSubscription(event, subscription) {
+    // Delete is protected by the backend using subscription id + current JWT user id.
+    event.stopPropagation();
+    setOpenMenuSubscriptionId(null);
     setError("");
 
+    const shouldDelete = window.confirm(
+        `Are you sure you want to delete "${subscription.name}"?`
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    try {
+      await deleteSubscription(subscription.id);
+
+      if (expandedSubscriptionId === subscription.id) {
+        setExpandedSubscriptionId(null);
+      }
+
+      await loadSubscriptions();
+    } catch {
+      setError("Could not delete subscription. Please try again.");
+    }
+  }
+
+  function buildSubscriptionPayload() {
     const nextPaymentDate = calculateNextPaymentDate(
-        newSubscription.startDate,
-        newSubscription.billingCycle
+        subscriptionForm.startDate,
+        subscriptionForm.billingCycle
     );
 
     if (!nextPaymentDate) {
+      return null;
+    }
+
+    // Backend field is still named provider.
+    // In the UI, we use it as "Paid by" until the backend field is renamed.
+    return {
+      name: subscriptionForm.name,
+      provider: subscriptionForm.paidBy || null,
+      price: Number(subscriptionForm.price),
+      billingCycle: subscriptionForm.billingCycle,
+      startDate: subscriptionForm.startDate,
+      nextPaymentDate,
+      autoRenew: true,
+      notifyEnabled: true,
+      notifyDaysBefore: 3,
+      currencyId: Number(subscriptionForm.currencyId),
+      categoryId: subscriptionForm.categoryId
+          ? Number(subscriptionForm.categoryId)
+          : null,
+      paymentMethodId: subscriptionForm.paymentMethodId
+          ? Number(subscriptionForm.paymentMethodId)
+          : null,
+      websiteUrl: subscriptionForm.websiteUrl || null,
+      notes: subscriptionForm.notes || null,
+    };
+  }
+
+  async function handleSubmitSubscription(event) {
+    event.preventDefault();
+    setError("");
+
+    const payload = buildSubscriptionPayload();
+
+    if (!payload) {
       setError("Please select a start date.");
       return;
     }
 
     try {
-      // Backend field is still named provider.
-      // In the UI, we use it as "Paid by" until the backend field is renamed.
-      await createSubscription({
-        name: newSubscription.name,
-        provider: newSubscription.paidBy || null,
-        price: Number(newSubscription.price),
-        billingCycle: newSubscription.billingCycle,
-        startDate: newSubscription.startDate,
-        nextPaymentDate,
-        autoRenew: true,
-        notifyEnabled: true,
-        notifyDaysBefore: 3,
-        currencyId: Number(newSubscription.currencyId),
-        categoryId: newSubscription.categoryId
-            ? Number(newSubscription.categoryId)
-            : null,
-        paymentMethodId: newSubscription.paymentMethodId
-            ? Number(newSubscription.paymentMethodId)
-            : null,
-        notes: newSubscription.notes || null,
-      });
+      if (editingSubscription) {
+        await updateSubscription(editingSubscription.id, payload);
+      } else {
+        await createSubscription(payload);
+      }
 
-      closeCreateModal();
+      closeSubscriptionModal();
       await loadSubscriptions();
     } catch {
-      setError("Could not create subscription. Please check the form values.");
+      setError("Could not save subscription. Please check the form values.");
     }
+  }
+
+  function openWebsite(event, websiteUrl) {
+    // Open website in a new tab only when the subscription has a valid URL.
+    event.stopPropagation();
+
+    if (!websiteUrl) {
+      setError("This subscription does not have a website URL.");
+      return;
+    }
+
+    window.open(websiteUrl, "_blank", "noopener,noreferrer");
   }
 
   if (!authUser) {
@@ -436,9 +547,7 @@ function App() {
                             <div className="st-action-menu">
                               <button
                                   type="button"
-                                  onClick={(event) =>
-                                      handleSubscriptionAction(event, "Edit subscription")
-                                  }
+                                  onClick={(event) => openEditModal(event, subscription)}
                               >
                                 ✎ Edit subscription
                               </button>
@@ -446,18 +555,13 @@ function App() {
                               <button
                                   type="button"
                                   onClick={(event) =>
-                                      handleSubscriptionAction(event, "Delete")
+                                      handleDeleteSubscription(event, subscription)
                                   }
                               >
                                 🗑 Delete
                               </button>
 
-                              <button
-                                  type="button"
-                                  onClick={(event) =>
-                                      handleSubscriptionAction(event, "Clone")
-                                  }
-                              >
+                              <button type="button" onClick={handleClonePlaceholder}>
                                 ⧉ Clone
                               </button>
                             </div>
@@ -494,10 +598,9 @@ function App() {
                             <button
                                 className="st-detail-website-button"
                                 type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setError("Website URL is not implemented yet.");
-                                }}
+                                onClick={(event) =>
+                                    openWebsite(event, subscription.websiteUrl)
+                                }
                             >
                               🌐
                             </button>
@@ -509,22 +612,24 @@ function App() {
           )}
         </section>
 
-        {isCreateModalOpen && (
+        {isSubscriptionModalOpen && (
             <div className="st-modal-backdrop">
               <section className="st-modal">
                 <header className="st-modal-header">
-                  <h2>Add subscription</h2>
-                  <button type="button" onClick={closeCreateModal}>
+                  <h2>
+                    {editingSubscription ? "Edit subscription" : "Add subscription"}
+                  </h2>
+                  <button type="button" onClick={closeSubscriptionModal}>
                     ×
                   </button>
                 </header>
 
-                <form className="st-modal-form" onSubmit={handleCreateSubscription}>
+                <form className="st-modal-form" onSubmit={handleSubmitSubscription}>
                   <div className="st-full-field">
                     <input
                         name="name"
                         type="text"
-                        value={newSubscription.name}
+                        value={subscriptionForm.name}
                         placeholder="Subscription name"
                         required
                         onChange={handleSubscriptionInputChange}
@@ -537,7 +642,7 @@ function App() {
                         type="number"
                         step="0.01"
                         min="0.01"
-                        value={newSubscription.price}
+                        value={subscriptionForm.price}
                         placeholder="Price"
                         required
                         onChange={handleSubscriptionInputChange}
@@ -545,7 +650,7 @@ function App() {
 
                     <select
                         name="currencyId"
-                        value={newSubscription.currencyId}
+                        value={subscriptionForm.currencyId}
                         required
                         onChange={handleSubscriptionInputChange}
                     >
@@ -562,14 +667,14 @@ function App() {
                     <input
                         name="paidBy"
                         type="text"
-                        value={newSubscription.paidBy}
+                        value={subscriptionForm.paidBy}
                         placeholder="Paid by (optional)"
                         onChange={handleSubscriptionInputChange}
                     />
 
                     <select
                         name="billingCycle"
-                        value={newSubscription.billingCycle}
+                        value={subscriptionForm.billingCycle}
                         required
                         onChange={handleSubscriptionInputChange}
                     >
@@ -582,7 +687,7 @@ function App() {
                   <div className="st-form-grid">
                     <select
                         name="categoryId"
-                        value={newSubscription.categoryId}
+                        value={subscriptionForm.categoryId}
                         onChange={handleSubscriptionInputChange}
                     >
                       <option value="">Select category</option>
@@ -595,7 +700,7 @@ function App() {
 
                     <select
                         name="paymentMethodId"
-                        value={newSubscription.paymentMethodId}
+                        value={subscriptionForm.paymentMethodId}
                         onChange={handleSubscriptionInputChange}
                     >
                       <option value="">Select payment method</option>
@@ -613,7 +718,7 @@ function App() {
                       <input
                           name="startDate"
                           type="date"
-                          value={newSubscription.startDate}
+                          value={subscriptionForm.startDate}
                           required
                           onChange={handleSubscriptionInputChange}
                       />
@@ -635,9 +740,19 @@ function App() {
 
                   <div className="st-full-field">
                     <input
+                        name="websiteUrl"
+                        type="text"
+                        value={subscriptionForm.websiteUrl}
+                        placeholder="Website URL, example: netflix.com"
+                        onChange={handleSubscriptionInputChange}
+                    />
+                  </div>
+
+                  <div className="st-full-field">
+                    <input
                         name="notes"
                         type="text"
-                        value={newSubscription.notes}
+                        value={subscriptionForm.notes}
                         placeholder="Notes"
                         onChange={handleSubscriptionInputChange}
                     />
@@ -647,13 +762,13 @@ function App() {
                     <button
                         className="st-secondary-button"
                         type="button"
-                        onClick={closeCreateModal}
+                        onClick={closeSubscriptionModal}
                     >
                       Cancel
                     </button>
 
                     <button className="st-primary-button" type="submit">
-                      Save
+                      {editingSubscription ? "Save changes" : "Save"}
                     </button>
                   </div>
                 </form>

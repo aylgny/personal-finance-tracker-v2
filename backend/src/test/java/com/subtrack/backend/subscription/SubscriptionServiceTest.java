@@ -9,6 +9,7 @@ import com.subtrack.backend.paymentmethod.PaymentMethodRepository;
 import com.subtrack.backend.shared.exception.ResourceNotFoundException;
 import com.subtrack.backend.subscription.dto.CreateSubscriptionRequest;
 import com.subtrack.backend.subscription.dto.SubscriptionResponse;
+import com.subtrack.backend.subscription.dto.UpdateSubscriptionRequest;
 import com.subtrack.backend.user.User;
 import com.subtrack.backend.user.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SubscriptionServiceTest {
 
-    // Mocked repositories so unit tests do not use a real database.
     @Mock
     private SubscriptionRepository subscriptionRepository;
 
@@ -47,13 +47,11 @@ class SubscriptionServiceTest {
     @Mock
     private PaymentMethodRepository paymentMethodRepository;
 
-    // Real service under test. Mockito injects the mocked repositories into it.
     @InjectMocks
     private SubscriptionService subscriptionService;
 
     @Test
     void getSubscriptionsForUser_shouldReturnSubscriptionResponses_forGivenUserId() {
-        // Arrange: create user-owned subscription with global reference data.
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
 
         Currency currency = new Currency(
@@ -80,7 +78,7 @@ class SubscriptionServiceTest {
                 paymentMethod,
                 currency,
                 "Netflix",
-                "Netflix",
+                "Aylin",
                 new BigDecimal("229.99"),
                 BillingCycle.MONTHLY,
                 SubscriptionStatus.ACTIVE,
@@ -89,23 +87,21 @@ class SubscriptionServiceTest {
                 true,
                 true,
                 3,
+                "https://netflix.com",
                 "Demo subscription"
         );
 
-        // Arrange: simulate repository returning only the authenticated user's subscriptions.
         when(subscriptionRepository.findByUserIdOrderByNextPaymentDateAsc(1L))
                 .thenReturn(List.of(subscription));
 
-        // Act: call the service method.
         List<SubscriptionResponse> responses = subscriptionService.getSubscriptionsForUser(1L);
 
-        // Assert: verify entity-to-DTO mapping.
         assertThat(responses).hasSize(1);
 
         SubscriptionResponse response = responses.get(0);
 
         assertThat(response.name()).isEqualTo("Netflix");
-        assertThat(response.provider()).isEqualTo("Netflix");
+        assertThat(response.provider()).isEqualTo("Aylin");
         assertThat(response.price()).isEqualByComparingTo("229.99");
         assertThat(response.currencyCode()).isEqualTo("TRY");
         assertThat(response.currencySymbol()).isEqualTo("₺");
@@ -118,31 +114,26 @@ class SubscriptionServiceTest {
         assertThat(response.notifyDaysBefore()).isEqualTo(3);
         assertThat(response.categoryName()).isEqualTo("Entertainment");
         assertThat(response.paymentMethodName()).isEqualTo("Credit Card");
+        assertThat(response.websiteUrl()).isEqualTo("https://netflix.com");
         assertThat(response.notes()).isEqualTo("Demo subscription");
 
-        // Verify: subscriptions are still filtered by authenticated user ID.
         verify(subscriptionRepository).findByUserIdOrderByNextPaymentDateAsc(1L);
     }
 
     @Test
     void getSubscriptionsForUser_shouldReturnEmptyList_whenUserHasNoSubscriptions() {
-        // Arrange: simulate that the user has no subscriptions.
         when(subscriptionRepository.findByUserIdOrderByNextPaymentDateAsc(2L))
                 .thenReturn(List.of());
 
-        // Act: call the service method.
         List<SubscriptionResponse> responses = subscriptionService.getSubscriptionsForUser(2L);
 
-        // Assert: service should return an empty response list.
         assertThat(responses).isEmpty();
 
-        // Verify: make sure the repository was called for the correct user.
         verify(subscriptionRepository).findByUserIdOrderByNextPaymentDateAsc(2L);
     }
 
     @Test
     void createSubscription_shouldCreateSubscription_whenReferenceDataExists() {
-        // Arrange: subscription is user-owned, but currency/category/payment method are global reference data.
         Long userId = 2L;
 
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
@@ -167,7 +158,7 @@ class SubscriptionServiceTest {
 
         CreateSubscriptionRequest request = new CreateSubscriptionRequest(
                 "YouTube Premium",
-                "Google",
+                "Aylin",
                 new BigDecimal("79.99"),
                 BillingCycle.MONTHLY,
                 LocalDate.of(2026, 6, 7),
@@ -178,10 +169,10 @@ class SubscriptionServiceTest {
                 10L,
                 20L,
                 30L,
+                "youtube.com",
                 "Personal subscription"
         );
 
-        // Arrange: user is resolved by JWT userId, while reference data is resolved globally by ID.
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(currencyRepository.findById(30L)).thenReturn(Optional.of(currency));
         when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
@@ -189,12 +180,10 @@ class SubscriptionServiceTest {
         when(subscriptionRepository.save(any(Subscription.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Act: create the subscription.
         SubscriptionResponse response = subscriptionService.createSubscription(userId, request);
 
-        // Assert: verify response contains subscription and reference data values.
         assertThat(response.name()).isEqualTo("YouTube Premium");
-        assertThat(response.provider()).isEqualTo("Google");
+        assertThat(response.provider()).isEqualTo("Aylin");
         assertThat(response.price()).isEqualByComparingTo("79.99");
         assertThat(response.currencyCode()).isEqualTo("TRY");
         assertThat(response.currencySymbol()).isEqualTo("₺");
@@ -202,9 +191,9 @@ class SubscriptionServiceTest {
         assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
         assertThat(response.categoryName()).isEqualTo("Entertainment");
         assertThat(response.paymentMethodName()).isEqualTo("Credit Card");
+        assertThat(response.websiteUrl()).isEqualTo("https://youtube.com");
         assertThat(response.notes()).isEqualTo("Personal subscription");
 
-        // Verify: global reference records are checked by ID, not by user ownership.
         verify(currencyRepository).findById(30L);
         verify(categoryRepository).findById(10L);
         verify(paymentMethodRepository).findById(20L);
@@ -213,7 +202,6 @@ class SubscriptionServiceTest {
 
     @Test
     void createSubscription_shouldCreateSubscription_whenOptionalCategoryAndPaymentMethodAreMissing() {
-        // Arrange: category and payment method are optional, but currency is required.
         Long userId = 2L;
 
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
@@ -227,7 +215,7 @@ class SubscriptionServiceTest {
 
         CreateSubscriptionRequest request = new CreateSubscriptionRequest(
                 "Google One",
-                "Google",
+                "Aylin",
                 new BigDecimal("19.99"),
                 BillingCycle.YEARLY,
                 LocalDate.of(2026, 6, 7),
@@ -238,6 +226,7 @@ class SubscriptionServiceTest {
                 null,
                 null,
                 30L,
+                null,
                 "Cloud storage subscription"
         );
 
@@ -246,15 +235,14 @@ class SubscriptionServiceTest {
         when(subscriptionRepository.save(any(Subscription.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Act: create subscription without optional reference data.
         SubscriptionResponse response = subscriptionService.createSubscription(userId, request);
 
-        // Assert: defaults should be applied and optional fields should remain null.
         assertThat(response.name()).isEqualTo("Google One");
         assertThat(response.currencyCode()).isEqualTo("USD");
         assertThat(response.currencySymbol()).isEqualTo("$");
         assertThat(response.categoryName()).isNull();
         assertThat(response.paymentMethodName()).isNull();
+        assertThat(response.websiteUrl()).isNull();
         assertThat(response.autoRenew()).isTrue();
         assertThat(response.notifyEnabled()).isTrue();
         assertThat(response.notifyDaysBefore()).isEqualTo(3);
@@ -265,14 +253,13 @@ class SubscriptionServiceTest {
 
     @Test
     void createSubscription_shouldThrowException_whenCurrencyDoesNotExist() {
-        // Arrange: currency is required even though it is global reference data.
         Long userId = 2L;
 
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
 
         CreateSubscriptionRequest request = new CreateSubscriptionRequest(
                 "YouTube Premium",
-                "Google",
+                "Aylin",
                 new BigDecimal("79.99"),
                 BillingCycle.MONTHLY,
                 LocalDate.of(2026, 6, 7),
@@ -283,17 +270,213 @@ class SubscriptionServiceTest {
                 null,
                 null,
                 30L,
+                "youtube.com",
                 "Personal subscription"
         );
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(currencyRepository.findById(30L)).thenReturn(Optional.empty());
 
-        // Act & Assert: creating a subscription with an unknown currency should fail.
         assertThatThrownBy(() -> subscriptionService.createSubscription(userId, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Currency not found");
 
         verify(currencyRepository).findById(30L);
+    }
+
+    @Test
+    void updateSubscription_shouldUpdateSubscription_whenSubscriptionBelongsToCurrentUser() {
+        Long userId = 2L;
+        Long subscriptionId = 5L;
+
+        User user = new User("Aylin", "aylin@test.com", "hashed-password");
+
+        Currency oldCurrency = new Currency(
+                "TRY",
+                "₺",
+                "Turkish Lira",
+                BigDecimal.ONE
+        );
+
+        Currency newCurrency = new Currency(
+                "USD",
+                "$",
+                "US Dollar",
+                BigDecimal.ONE
+        );
+
+        Category oldCategory = new Category(
+                "Entertainment",
+                1
+        );
+
+        Category newCategory = new Category(
+                "Productivity",
+                2
+        );
+
+        PaymentMethod oldPaymentMethod = new PaymentMethod(
+                "Credit Card",
+                true,
+                1
+        );
+
+        PaymentMethod newPaymentMethod = new PaymentMethod(
+                "Debit Card",
+                true,
+                2
+        );
+
+        Subscription subscription = new Subscription(
+                user,
+                oldCategory,
+                oldPaymentMethod,
+                oldCurrency,
+                "Netflix",
+                "Aylin",
+                new BigDecimal("229.99"),
+                BillingCycle.MONTHLY,
+                SubscriptionStatus.ACTIVE,
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 6, 15),
+                true,
+                true,
+                3,
+                "https://netflix.com",
+                "Old notes"
+        );
+
+        UpdateSubscriptionRequest request = new UpdateSubscriptionRequest(
+                "Claude",
+                "Aylin",
+                new BigDecimal("17.00"),
+                BillingCycle.MONTHLY,
+                LocalDate.of(2026, 6, 7),
+                LocalDate.of(2026, 7, 7),
+                true,
+                true,
+                5,
+                11L,
+                22L,
+                33L,
+                "claude.ai",
+                "Updated subscription"
+        );
+
+        when(subscriptionRepository.findByIdAndUserId(subscriptionId, userId))
+                .thenReturn(Optional.of(subscription));
+        when(currencyRepository.findById(33L)).thenReturn(Optional.of(newCurrency));
+        when(categoryRepository.findById(11L)).thenReturn(Optional.of(newCategory));
+        when(paymentMethodRepository.findById(22L)).thenReturn(Optional.of(newPaymentMethod));
+        when(subscriptionRepository.save(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        SubscriptionResponse response = subscriptionService.updateSubscription(userId, subscriptionId, request);
+
+        assertThat(response.name()).isEqualTo("Claude");
+        assertThat(response.provider()).isEqualTo("Aylin");
+        assertThat(response.price()).isEqualByComparingTo("17.00");
+        assertThat(response.currencyCode()).isEqualTo("USD");
+        assertThat(response.currencySymbol()).isEqualTo("$");
+        assertThat(response.categoryName()).isEqualTo("Productivity");
+        assertThat(response.paymentMethodName()).isEqualTo("Debit Card");
+        assertThat(response.websiteUrl()).isEqualTo("https://claude.ai");
+        assertThat(response.notes()).isEqualTo("Updated subscription");
+        assertThat(response.notifyDaysBefore()).isEqualTo(5);
+
+        verify(subscriptionRepository).findByIdAndUserId(subscriptionId, userId);
+        verify(currencyRepository).findById(33L);
+        verify(categoryRepository).findById(11L);
+        verify(paymentMethodRepository).findById(22L);
+        verify(subscriptionRepository).save(any(Subscription.class));
+    }
+
+    @Test
+    void updateSubscription_shouldThrowException_whenSubscriptionDoesNotBelongToCurrentUser() {
+        Long userId = 2L;
+        Long subscriptionId = 999L;
+
+        UpdateSubscriptionRequest request = new UpdateSubscriptionRequest(
+                "Claude",
+                "Aylin",
+                new BigDecimal("17.00"),
+                BillingCycle.MONTHLY,
+                LocalDate.of(2026, 6, 7),
+                LocalDate.of(2026, 7, 7),
+                true,
+                true,
+                5,
+                null,
+                null,
+                33L,
+                "claude.ai",
+                "Updated subscription"
+        );
+
+        when(subscriptionRepository.findByIdAndUserId(subscriptionId, userId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.updateSubscription(userId, subscriptionId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Subscription not found");
+
+        verify(subscriptionRepository).findByIdAndUserId(subscriptionId, userId);
+    }
+
+    @Test
+    void deleteSubscription_shouldDeleteSubscription_whenSubscriptionBelongsToCurrentUser() {
+        Long userId = 2L;
+        Long subscriptionId = 5L;
+
+        User user = new User("Aylin", "aylin@test.com", "hashed-password");
+
+        Currency currency = new Currency(
+                "TRY",
+                "₺",
+                "Turkish Lira",
+                BigDecimal.ONE
+        );
+
+        Subscription subscription = new Subscription(
+                user,
+                null,
+                null,
+                currency,
+                "Spotify",
+                "Aylin",
+                new BigDecimal("70.00"),
+                BillingCycle.MONTHLY,
+                SubscriptionStatus.ACTIVE,
+                LocalDate.of(2026, 6, 7),
+                LocalDate.of(2026, 7, 7),
+                true,
+                true,
+                3,
+                "https://spotify.com",
+                "Music subscription"
+        );
+
+        when(subscriptionRepository.findByIdAndUserId(subscriptionId, userId))
+                .thenReturn(Optional.of(subscription));
+
+        subscriptionService.deleteSubscription(userId, subscriptionId);
+
+        verify(subscriptionRepository).findByIdAndUserId(subscriptionId, userId);
+        verify(subscriptionRepository).delete(subscription);
+    }
+
+    @Test
+    void deleteSubscription_shouldThrowException_whenSubscriptionDoesNotBelongToCurrentUser() {
+        Long userId = 2L;
+        Long subscriptionId = 999L;
+
+        when(subscriptionRepository.findByIdAndUserId(subscriptionId, userId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.deleteSubscription(userId, subscriptionId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Subscription not found");
+
+        verify(subscriptionRepository).findByIdAndUserId(subscriptionId, userId);
     }
 }
