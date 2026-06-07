@@ -53,11 +53,10 @@ class SubscriptionServiceTest {
 
     @Test
     void getSubscriptionsForUser_shouldReturnSubscriptionResponses_forGivenUserId() {
-        // Arrange: create related domain objects used by the subscription entity.
+        // Arrange: create user-owned subscription with global reference data.
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
 
         Currency currency = new Currency(
-                user,
                 "TRY",
                 "₺",
                 "Turkish Lira",
@@ -65,13 +64,11 @@ class SubscriptionServiceTest {
         );
 
         Category category = new Category(
-                user,
-                "Streaming",
+                "Entertainment",
                 1
         );
 
         PaymentMethod paymentMethod = new PaymentMethod(
-                user,
                 "Credit Card",
                 true,
                 1
@@ -95,14 +92,14 @@ class SubscriptionServiceTest {
                 "Demo subscription"
         );
 
-        // Arrange: simulate repository returning subscriptions for the requested user.
+        // Arrange: simulate repository returning only the authenticated user's subscriptions.
         when(subscriptionRepository.findByUserIdOrderByNextPaymentDateAsc(1L))
                 .thenReturn(List.of(subscription));
 
         // Act: call the service method.
         List<SubscriptionResponse> responses = subscriptionService.getSubscriptionsForUser(1L);
 
-        // Assert: verify that the service maps the Subscription entity to the response DTO correctly.
+        // Assert: verify entity-to-DTO mapping.
         assertThat(responses).hasSize(1);
 
         SubscriptionResponse response = responses.get(0);
@@ -119,11 +116,11 @@ class SubscriptionServiceTest {
         assertThat(response.autoRenew()).isTrue();
         assertThat(response.notifyEnabled()).isTrue();
         assertThat(response.notifyDaysBefore()).isEqualTo(3);
-        assertThat(response.categoryName()).isEqualTo("Streaming");
+        assertThat(response.categoryName()).isEqualTo("Entertainment");
         assertThat(response.paymentMethodName()).isEqualTo("Credit Card");
         assertThat(response.notes()).isEqualTo("Demo subscription");
 
-        // Verify: make sure the repository was called with the expected userId.
+        // Verify: subscriptions are still filtered by authenticated user ID.
         verify(subscriptionRepository).findByUserIdOrderByNextPaymentDateAsc(1L);
     }
 
@@ -144,14 +141,13 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    void createSubscription_shouldCreateSubscription_whenRelatedResourcesBelongToUser() {
-        // Arrange: create the authenticated user and related resources.
+    void createSubscription_shouldCreateSubscription_whenReferenceDataExists() {
+        // Arrange: subscription is user-owned, but currency/category/payment method are global reference data.
         Long userId = 2L;
 
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
 
         Currency currency = new Currency(
-                user,
                 "TRY",
                 "₺",
                 "Turkish Lira",
@@ -159,13 +155,11 @@ class SubscriptionServiceTest {
         );
 
         Category category = new Category(
-                user,
-                "Streaming",
+                "Entertainment",
                 1
         );
 
         PaymentMethod paymentMethod = new PaymentMethod(
-                user,
                 "Credit Card",
                 true,
                 1
@@ -187,18 +181,18 @@ class SubscriptionServiceTest {
                 "Personal subscription"
         );
 
-        // Arrange: simulate ownership checks for the authenticated user.
+        // Arrange: user is resolved by JWT userId, while reference data is resolved globally by ID.
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(currencyRepository.findByIdAndUserId(30L, userId)).thenReturn(Optional.of(currency));
-        when(categoryRepository.findByIdAndUserId(10L, userId)).thenReturn(Optional.of(category));
-        when(paymentMethodRepository.findByIdAndUserId(20L, userId)).thenReturn(Optional.of(paymentMethod));
+        when(currencyRepository.findById(30L)).thenReturn(Optional.of(currency));
+        when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
+        when(paymentMethodRepository.findById(20L)).thenReturn(Optional.of(paymentMethod));
         when(subscriptionRepository.save(any(Subscription.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Act: call the create method.
+        // Act: create the subscription.
         SubscriptionResponse response = subscriptionService.createSubscription(userId, request);
 
-        // Assert: verify that the response contains the created subscription data.
+        // Assert: verify response contains subscription and reference data values.
         assertThat(response.name()).isEqualTo("YouTube Premium");
         assertThat(response.provider()).isEqualTo("Google");
         assertThat(response.price()).isEqualByComparingTo("79.99");
@@ -206,20 +200,72 @@ class SubscriptionServiceTest {
         assertThat(response.currencySymbol()).isEqualTo("₺");
         assertThat(response.billingCycle()).isEqualTo(BillingCycle.MONTHLY);
         assertThat(response.status()).isEqualTo(SubscriptionStatus.ACTIVE);
-        assertThat(response.categoryName()).isEqualTo("Streaming");
+        assertThat(response.categoryName()).isEqualTo("Entertainment");
         assertThat(response.paymentMethodName()).isEqualTo("Credit Card");
         assertThat(response.notes()).isEqualTo("Personal subscription");
 
-        // Verify: ensure related resources were checked with both ID and userId to prevent IDOR.
-        verify(currencyRepository).findByIdAndUserId(30L, userId);
-        verify(categoryRepository).findByIdAndUserId(10L, userId);
-        verify(paymentMethodRepository).findByIdAndUserId(20L, userId);
+        // Verify: global reference records are checked by ID, not by user ownership.
+        verify(currencyRepository).findById(30L);
+        verify(categoryRepository).findById(10L);
+        verify(paymentMethodRepository).findById(20L);
         verify(subscriptionRepository).save(any(Subscription.class));
     }
 
     @Test
-    void createSubscription_shouldThrowException_whenCurrencyDoesNotBelongToUser() {
-        // Arrange: currency is required and must belong to the authenticated user.
+    void createSubscription_shouldCreateSubscription_whenOptionalCategoryAndPaymentMethodAreMissing() {
+        // Arrange: category and payment method are optional, but currency is required.
+        Long userId = 2L;
+
+        User user = new User("Aylin", "aylin@test.com", "hashed-password");
+
+        Currency currency = new Currency(
+                "USD",
+                "$",
+                "US Dollar",
+                BigDecimal.ONE
+        );
+
+        CreateSubscriptionRequest request = new CreateSubscriptionRequest(
+                "Google One",
+                "Google",
+                new BigDecimal("19.99"),
+                BillingCycle.YEARLY,
+                LocalDate.of(2026, 6, 7),
+                LocalDate.of(2027, 6, 7),
+                null,
+                null,
+                null,
+                null,
+                null,
+                30L,
+                "Cloud storage subscription"
+        );
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(currencyRepository.findById(30L)).thenReturn(Optional.of(currency));
+        when(subscriptionRepository.save(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act: create subscription without optional reference data.
+        SubscriptionResponse response = subscriptionService.createSubscription(userId, request);
+
+        // Assert: defaults should be applied and optional fields should remain null.
+        assertThat(response.name()).isEqualTo("Google One");
+        assertThat(response.currencyCode()).isEqualTo("USD");
+        assertThat(response.currencySymbol()).isEqualTo("$");
+        assertThat(response.categoryName()).isNull();
+        assertThat(response.paymentMethodName()).isNull();
+        assertThat(response.autoRenew()).isTrue();
+        assertThat(response.notifyEnabled()).isTrue();
+        assertThat(response.notifyDaysBefore()).isEqualTo(3);
+
+        verify(currencyRepository).findById(30L);
+        verify(subscriptionRepository).save(any(Subscription.class));
+    }
+
+    @Test
+    void createSubscription_shouldThrowException_whenCurrencyDoesNotExist() {
+        // Arrange: currency is required even though it is global reference data.
         Long userId = 2L;
 
         User user = new User("Aylin", "aylin@test.com", "hashed-password");
@@ -241,13 +287,13 @@ class SubscriptionServiceTest {
         );
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(currencyRepository.findByIdAndUserId(30L, userId)).thenReturn(Optional.empty());
+        when(currencyRepository.findById(30L)).thenReturn(Optional.empty());
 
-        // Act & Assert: the service should reject a currency that is not visible to this user.
+        // Act & Assert: creating a subscription with an unknown currency should fail.
         assertThatThrownBy(() -> subscriptionService.createSubscription(userId, request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Currency not found");
 
-        verify(currencyRepository).findByIdAndUserId(30L, userId);
+        verify(currencyRepository).findById(30L);
     }
 }
