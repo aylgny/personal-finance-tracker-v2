@@ -3,6 +3,12 @@ package com.subtrack.backend.auth;
 import com.subtrack.backend.auth.dto.AuthResponse;
 import com.subtrack.backend.auth.dto.LoginRequest;
 import com.subtrack.backend.auth.dto.RegisterRequest;
+import com.subtrack.backend.category.Category;
+import com.subtrack.backend.category.CategoryRepository;
+import com.subtrack.backend.currency.Currency;
+import com.subtrack.backend.currency.CurrencyRepository;
+import com.subtrack.backend.paymentmethod.PaymentMethod;
+import com.subtrack.backend.paymentmethod.PaymentMethodRepository;
 import com.subtrack.backend.shared.exception.DuplicateResourceException;
 import com.subtrack.backend.shared.exception.UnauthorizedException;
 import com.subtrack.backend.user.User;
@@ -28,6 +34,18 @@ class AuthServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    // Mocked repository used to verify that default currency data is created after registration.
+    @Mock
+    private CurrencyRepository currencyRepository;
+
+    // Mocked repository used to verify that default category data is created after registration.
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    // Mocked repository used to verify that default payment method data is created after registration.
+    @Mock
+    private PaymentMethodRepository paymentMethodRepository;
+
     // Mocked password encoder so we can control password hashing and matching behavior.
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -37,12 +55,12 @@ class AuthServiceTest {
     private JwtService jwtService;
 
     // AuthService is the real class under test.
-    // Mockito injects the mocked dependencies above into this service.
+    // Mockito injects all mocked dependencies above into this service.
     @InjectMocks
     private AuthService authService;
 
     @Test
-    void register_shouldCreateUserAndReturnToken_whenEmailIsNotUsed() {
+    void register_shouldCreateUserDefaultDataAndReturnToken_whenEmailIsNotUsed() {
         // Arrange: create a register request as if it came from the frontend.
         RegisterRequest request = new RegisterRequest(
                 "Aylin",
@@ -76,11 +94,18 @@ class AuthServiceTest {
         verify(userRepository).existsByEmail("aylin@test.com");
         verify(passwordEncoder).encode("123456");
         verify(userRepository).save(any(User.class));
+
+        // Verify: successful registration should create default user-owned setup data.
+        verify(currencyRepository).save(any(Currency.class));
+        verify(categoryRepository).save(any(Category.class));
+        verify(paymentMethodRepository).save(any(PaymentMethod.class));
+
+        // Verify: token should be generated after the user is saved.
         verify(jwtService).generateToken(savedUser.getId(), savedUser.getEmail());
     }
 
     @Test
-    void register_shouldThrowException_whenEmailAlreadyExists() {
+    void register_shouldThrowExceptionAndSkipDefaultData_whenEmailAlreadyExists() {
         // Arrange: create a request using an email that already exists.
         RegisterRequest request = new RegisterRequest(
                 "Aylin",
@@ -91,15 +116,20 @@ class AuthServiceTest {
         // Arrange: simulate that this email is already used.
         when(userRepository.existsByEmail("aylin@test.com")).thenReturn(true);
 
-        // Act & Assert: duplicate email should now map to a Conflict-style custom exception.
+        // Act & Assert: duplicate email should map to a Conflict-style custom exception.
         assertThatThrownBy(() -> authService.register(request))
                 .isInstanceOf(DuplicateResourceException.class)
                 .hasMessage("Email is already in use");
 
-        // Verify: when email already exists, no password hashing, saving, or token generation should happen.
+        // Verify: when email already exists, no password hashing, saving, default data, or token generation should happen.
         verify(userRepository).existsByEmail("aylin@test.com");
         verify(userRepository, never()).save(any(User.class));
         verify(passwordEncoder, never()).encode(anyString());
+
+        verify(currencyRepository, never()).save(any(Currency.class));
+        verify(categoryRepository, never()).save(any(Category.class));
+        verify(paymentMethodRepository, never()).save(any(PaymentMethod.class));
+
         verify(jwtService, never()).generateToken(any(), anyString());
     }
 
@@ -138,6 +168,11 @@ class AuthServiceTest {
         verify(userRepository).findByEmail("aylin@test.com");
         verify(passwordEncoder).matches("123456", "hashed-password");
         verify(jwtService).generateToken(user.getId(), user.getEmail());
+
+        // Verify: login should not create default setup data.
+        verify(currencyRepository, never()).save(any(Currency.class));
+        verify(categoryRepository, never()).save(any(Category.class));
+        verify(paymentMethodRepository, never()).save(any(PaymentMethod.class));
     }
 
     @Test
@@ -161,6 +196,11 @@ class AuthServiceTest {
         verify(userRepository).findByEmail("missing@test.com");
         verify(passwordEncoder, never()).matches(anyString(), anyString());
         verify(jwtService, never()).generateToken(any(), anyString());
+
+        // Verify: failed login should not create default setup data.
+        verify(currencyRepository, never()).save(any(Currency.class));
+        verify(categoryRepository, never()).save(any(Category.class));
+        verify(paymentMethodRepository, never()).save(any(PaymentMethod.class));
     }
 
     @Test
@@ -193,5 +233,10 @@ class AuthServiceTest {
         verify(userRepository).findByEmail("aylin@test.com");
         verify(passwordEncoder).matches("wrong-password", "hashed-password");
         verify(jwtService, never()).generateToken(any(), anyString());
+
+        // Verify: failed login should not create default setup data.
+        verify(currencyRepository, never()).save(any(Currency.class));
+        verify(categoryRepository, never()).save(any(Category.class));
+        verify(paymentMethodRepository, never()).save(any(PaymentMethod.class));
     }
 }
