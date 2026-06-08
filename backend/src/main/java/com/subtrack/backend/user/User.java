@@ -1,8 +1,13 @@
 package com.subtrack.backend.user;
 
 import com.subtrack.backend.shared.BaseEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 
+/**
+ * Represents an application user.
+ */
 @Entity
 @Table(name = "app_users")
 public class User extends BaseEntity {
@@ -22,6 +27,16 @@ public class User extends BaseEntity {
     public User(String name, String email, String passwordHash) {
         this.name = name;
         this.email = email;
+        this.passwordHash = passwordHash;
+    }
+
+    /**
+     * Updates the stored password hash.
+     *
+     * This is needed for seeded/demo users because demo credentials must stay valid
+     * even if the existing database contains an old or invalid password hash.
+     */
+    public void updatePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
 
