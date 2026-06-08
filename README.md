@@ -39,6 +39,24 @@ For the demo account, AI recommendations are hardcoded to avoid consuming Gemini
 
 ---
 
+## Screenshots
+
+### Login
+
+![Login page](screenshots/login.png)
+
+### Dashboard
+
+![Dashboard page](screenshots/dashboard.png)
+
+### Subscriptions
+
+![Subscriptions page](screenshots/subscriptions.png)
+
+### Calendar
+
+![Calendar page](screenshots/calendar.png)
+
 ## Features
 
 ### Authentication
