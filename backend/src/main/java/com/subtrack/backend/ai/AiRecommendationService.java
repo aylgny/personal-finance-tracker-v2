@@ -7,6 +7,8 @@ import com.subtrack.backend.ai.dto.GeminiRequest;
 import com.subtrack.backend.ai.dto.GeminiResponse;
 import com.subtrack.backend.subscription.Subscription;
 import com.subtrack.backend.subscription.SubscriptionRepository;
+import com.subtrack.backend.user.User;
+import com.subtrack.backend.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,14 +21,19 @@ import java.util.List;
 /**
  * Generates AI recommendations for subscription savings.
  *
- * If Gemini API key is missing or Gemini fails, this service returns fallback recommendations.
+ * Demo users receive fixed recommendations to avoid consuming Gemini quota.
+ * Normal users receive Gemini recommendations when an API key exists.
+ * If Gemini is not configured or fails, this service returns fallback recommendations.
  */
 @Service
 public class AiRecommendationService {
 
     private static final Logger logger = LoggerFactory.getLogger(AiRecommendationService.class);
 
+    private static final String DEMO_EMAIL = "demo@subtrack.com";
+
     private final SubscriptionRepository subscriptionRepository;
+    private final UserRepository userRepository;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String geminiApiKey;
@@ -34,12 +41,14 @@ public class AiRecommendationService {
 
     public AiRecommendationService(
             SubscriptionRepository subscriptionRepository,
+            UserRepository userRepository,
             RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,
             @Value("${gemini.api.key:}") String geminiApiKey,
             @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent}") String geminiApiUrl
     ) {
         this.subscriptionRepository = subscriptionRepository;
+        this.userRepository = userRepository;
         this.restClient = restClientBuilder.build();
         this.objectMapper = objectMapper;
         this.geminiApiKey = geminiApiKey;
@@ -50,6 +59,13 @@ public class AiRecommendationService {
      * Generates recommendations for the authenticated user.
      */
     public AiRecommendationResponse generateRecommendations(Long userId) {
+        // Demo account should not consume Gemini quota.
+        // It always receives stable portfolio-friendly recommendations.
+        if (isDemoUser(userId)) {
+            logger.info("Returning hardcoded AI recommendations for demo user.");
+            return new AiRecommendationResponse(getDemoRecommendations());
+        }
+
         List<Subscription> subscriptions =
                 subscriptionRepository.findByUserIdOrderByNextPaymentDateAsc(userId);
 
@@ -105,6 +121,16 @@ public class AiRecommendationService {
 
             return new AiRecommendationResponse(getFallbackRecommendations());
         }
+    }
+
+    /**
+     * Checks whether the authenticated user is the public demo account.
+     */
+    private boolean isDemoUser(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getEmail)
+                .map(email -> email.equalsIgnoreCase(DEMO_EMAIL))
+                .orElse(false);
     }
 
     /**
@@ -189,6 +215,31 @@ public class AiRecommendationService {
             logger.warn("Could not parse Gemini response as structured JSON: {}", exception.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Returns fixed recommendations for the public demo account.
+     *
+     * These recommendations match the seeded demo subscriptions and avoid Gemini quota usage.
+     */
+    private List<RecommendationItem> getDemoRecommendations() {
+        return List.of(
+                new RecommendationItem(
+                        "Consolidate music apps",
+                        "Spotify and YouTube Premium both cover music streaming. Consider keeping one if you do not need both.",
+                        "Potential saving: ₺80 monthly"
+                ),
+                new RecommendationItem(
+                        "Review inactive ChatGPT",
+                        "ChatGPT is inactive in the demo account. Keeping inactive subscriptions disabled helps prevent unnecessary renewals.",
+                        "Avoid ₺1000 monthly charge"
+                ),
+                new RecommendationItem(
+                        "Check high-cost AI tools",
+                        "Claude AI is one of the highest monthly costs in this demo. Review whether it is still worth the recurring price.",
+                        "Potential saving: ₺750 monthly"
+                )
+        );
     }
 
     /**
