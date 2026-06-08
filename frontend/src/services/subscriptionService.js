@@ -26,3 +26,15 @@ export async function deleteSubscription(subscriptionId) {
   // Successful delete returns 204 No Content.
   await api.delete(`/api/subscriptions/${subscriptionId}`);
 }
+
+export async function disableSubscription(subscriptionId) {
+  // Marks a subscription as inactive without deleting it from the database.
+  const response = await api.patch(`/api/subscriptions/${subscriptionId}/disable`);
+  return response.data;
+}
+
+export async function activateSubscription(subscriptionId) {
+  // Marks an inactive subscription as active again.
+  const response = await api.patch(`/api/subscriptions/${subscriptionId}/activate`);
+  return response.data;
+}
